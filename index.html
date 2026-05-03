@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Severe Weather Tracker</title>
 
-<!-- Leaflet CSS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
@@ -25,6 +24,11 @@ header {
 .container {
     display: flex;
     flex-wrap: wrap;
+}
+
+label {
+    font-weight: bold;
+    color: #bc2222;
 }
 
 .form-section {
@@ -49,7 +53,12 @@ header {
     background: white;
     padding: 10px;
     margin-bottom: 10px;
-    border-left: 5px solid #3498db;
+    transition: 0.3s;
+}
+
+.report-card.active {
+    border: 3px solid red;
+    background: #ffe6e6;
 }
 
 img.preview {
@@ -80,6 +89,9 @@ img.preview {
             <option value="Snow">Snow</option>
         </select><br><br>
 
+        <label>Report Date:</label><br>
+        <input type="date" id="reportDate"><br><br>
+
         <label>Description:</label><br>
         <textarea id="description" rows="4" style="width:100%;"></textarea><br><br>
 
@@ -95,29 +107,37 @@ img.preview {
     <!-- REPORTS -->
     <div class="reports">
         <h2>Reports</h2>
+
+        <label>Filter by Date:</label><br>
+        <input type="date" id="filterDate">
+        <button onclick="applyFilter()">Apply</button>
+        <button onclick="clearFilter()">Show All</button>
+        <br><br>
+
         <div id="reportList"></div>
     </div>
 
 </div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
 let selectedLat = null;
 let selectedLng = null;
+let activeFilterDate = null;
 
 // Initialize map
 const map = L.map('map').setView([37.33, -79.18], 8);
 
-// Map tiles
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '© OpenStreetMap'
 }).addTo(map);
 
+const reportMarkers = L.layerGroup().addTo(map);
+
 let marker;
 
-// Click map to select location
+// Click to choose location
 map.on('click', function(e) {
     selectedLat = e.latlng.lat;
     selectedLng = e.latlng.lng;
@@ -129,17 +149,28 @@ map.on('click', function(e) {
     }
 });
 
-// Load saved reports
+// Load reports
 let reports = JSON.parse(localStorage.getItem('reports')) || [];
+
+// Auto-fill today's date
+document.getElementById('reportDate').valueAsDate = new Date();
+
 renderReports();
 
+// Submit report
 function submitReport() {
     const type = document.getElementById('weatherType').value;
     const desc = document.getElementById('description').value;
+    const date = document.getElementById('reportDate').value;
     const imageInput = document.getElementById('imageUpload');
 
     if (!selectedLat || !selectedLng) {
         alert("Please select a location on the map.");
+        return;
+    }
+
+    if (!date) {
+        alert("Please select a date.");
         return;
     }
 
@@ -149,6 +180,7 @@ function submitReport() {
         const report = {
             type,
             desc,
+            date,
             lat: selectedLat,
             lng: selectedLng,
             image: reader.result || null
@@ -167,16 +199,57 @@ function submitReport() {
     }
 }
 
+// Filter controls
+function applyFilter() {
+    activeFilterDate = document.getElementById('filterDate').value;
+    renderReports();
+}
+
+function clearFilter() {
+    activeFilterDate = null;
+    document.getElementById('filterDate').value = "";
+    renderReports();
+}
+
+// Marker styling
+function getIcon(type) {
+    const colors = {
+        Tornado: "red",
+        Hail: "blue",
+        Flood: "green",
+        Thunderstorm: "purple",
+        Snow: "gray"
+    };
+
+    return L.divIcon({
+        html: `<div style="
+            background:${colors[type]};
+            width:15px;
+            height:15px;
+            border-radius:50%;
+            border:2px solid white;
+        "></div>`
+    });
+}
+
+// Render everything
 function renderReports() {
     const list = document.getElementById('reportList');
     list.innerHTML = "";
+    reportMarkers.clearLayers();
 
-    reports.forEach(r => {
+    reports.forEach((r, index) => {
+
+        // FILTER
+        if (activeFilterDate && r.date !== activeFilterDate) return;
+
         const div = document.createElement('div');
         div.className = "report-card";
+        div.id = "report-" + index;
 
         div.innerHTML = `
             <strong>${r.type}</strong><br>
+            <em>${r.date}</em><br>
             ${r.desc}<br>
             <small>Lat: ${r.lat.toFixed(2)}, Lng: ${r.lng.toFixed(2)}</small>
         `;
@@ -189,6 +262,23 @@ function renderReports() {
         }
 
         list.appendChild(div);
+
+        const m = L.marker([r.lat, r.lng], {
+            icon: getIcon(r.type)
+        }).addTo(reportMarkers);
+
+        m.bindPopup(`<strong>${r.type}</strong><br>${r.desc}`);
+
+        // Click marker → scroll to report
+        m.on('click', () => {
+            document.querySelectorAll('.report-card').forEach(card => {
+                card.classList.remove('active');
+            });
+
+            const target = document.getElementById("report-" + index);
+            target.classList.add('active');
+            target.scrollIntoView({ behavior: "smooth" });
+        });
     });
 }
 </script>
