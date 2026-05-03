@@ -30,6 +30,9 @@ label {
     font-weight: bold;
     color: #bc2222;
 }
+textarea {
+    resize: none;
+}
 
 .form-section {
     flex: 1;
@@ -126,7 +129,7 @@ let selectedLat = null;
 let selectedLng = null;
 let activeFilterDate = null;
 
-// Initialize map
+// Initialize the map
 const map = L.map('map').setView([37.33, -79.18], 8);
 
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -137,7 +140,7 @@ const reportMarkers = L.layerGroup().addTo(map);
 
 let marker;
 
-// Click to choose location
+
 map.on('click', function(e) {
     selectedLat = e.latlng.lat;
     selectedLng = e.latlng.lng;
